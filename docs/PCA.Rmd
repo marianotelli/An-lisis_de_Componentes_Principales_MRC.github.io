@@ -1,0 +1,172 @@
+---
+title: "Análisis de Componentes Principales"
+author: "Mariano Raso Cortina"
+date: '2022-09-23'
+output: 
+  html_document:
+    fig_caption: yes
+    theme: cerulean
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Análisis de Componentes Principales 
+
+### _**Fenómeno a explicar**_
+
+El análisis de componentes principales transforma un conjunto de variables correlacionadas en un nuevo conjunto de variables no correlacionadas **(Almenara et al., 1998).** 
+Es lo que conocemos como técnica de reducción de dimensionalidad dentro de la <span style="color:red">estadística multivariada</span>, buscando la pérdida mínima de la información.
+
+### _**Explicación Problema**_
+
+Nuestras 8 varibles son: _ingresos_, _nivel de educación_, _edad_, _tiempo viviendo en la residencia actual_, _tiempo trabajando para el empleador actual_, _ahorros_, _deuda_ y _número de tarjetas de crédito_.
+Lo que se pretende es analizarlas, para agruparlas y explicarlas de mejor manera, de modo que, el _gerente_ de una institución financiera pueda tomar mejores decisiones y simplificar el modelado en un futuro.
+
+
+```{r cars, include=FALSE}
+setwd("~/DS_Course/Proyecto_Personal")
+library(readxl)
+x <- read_excel("ACP.xlsx")
+library(dplyr)
+library(psych)
+library(ggplot2)
+library(dplyr)
+library(FactoMineR)
+library(factoextra)
+library(corrplot)
+```
+
+
+```{r, echo = FALSE}
+print(paste("la cantidad de observaciones que tenemos es:",nrow(x)))
+```
+
+
+### _Resumen de datos_
+
+```{r}
+head(x)
+```
+
+
+
+### _Análisis Descriptivo_
+
+```{r }
+summary(x)
+```
+
+
+### _Analizando la relación entre las variables_
+
+```{r }
+round(cor(x = x, method = "pearson"), 3)
+```
+
+### _Correlación Entre Variables_
+
+```{r }
+pairs.panels(x, 
+             pch=20,
+             stars=T,
+             main="Gráfico de Correlación")
+```
+
+
+### **Análisis de Componentes Principales**
+
+```{r, include=FALSE}
+ACP <- PCA(x, scale.unit = T, ncp = 8, graph = T)
+```
+
+Cabe recalcar que tuvimos que <span style="color:blue">estandarizar</span> las variables dentro de la función PCA(), debido a que no todas se encuentran la misma escala. 
+
+
+Por definición, el número máximo de componentes principales que podemos obtener es igual al número de variables que tenemos, en este caso 8. 
+
+R, nos arroja, en esta matriz, el componente, su eigenvalor (o valor propio), el porcentaje de varianza que explica el componente y finalmente el % de varianza acumulada, que al final es del 100% en el Componente 8.
+
+
+```{r,  echo = FALSE}
+ACP$eig
+```
+
+#### **Escogiendo el Número de Componentes**
+
+Tenemos dos criterios principales. El primero de ellos es el de Kaiser y este consiste en que deben conservarse solamente aquellos _Componentes_ cuyos eigenvalues sean mayores a 1.
+
+El segundo es con la gráfica de sedimentación y en donde notemos un codo.
+
+En ambos casos, tenemos que, podemos tomar hasta
+
+Como buscamos reducir dimensionalidad y agrupar, vemos que con tan solo Dos Componentes podemos explicar el 70.9% de la variabilidad total del conjunto de datos, y por este motivo es que para este ejemplo tomaré solamente dos Componentes. 
+
+
+```{r, echo = FALSE}
+matrizeig <- as.data.frame(ACP$eig)
+y <- c(1:8)
+plot(matrizeig$eigenvalue, type = "b", pch = 21,
+     bg = "blue", ylab = "Valor Propio", xlab = "Número de Componente",
+     main = 'Grafica de sedimentación')
+text(x = 5, y = 1.2, "Se puede tomar hasta el 3er CP")
+```
+
+#### **Variables en los Componentes**
+
+Extrayendo las contribuciones que tiene cada variable por cada uno de los componentes principales, tenemos que en el **CP1** tienen mayor peso las variables Ingresos, edad, residencia, empleo y ahorros.
+Por su parte, el **CP2**, se encuentra influido por la Educación, deuda y tarjeta de crédito.
+
+```{r, echo=F}
+contribucion <- as.data.frame(ACP$var$contrib)
+contribucion <- contribucion[,c(1,2)]
+contribucion
+```
+
+Igualmente, de manera gráfica lo podemos visualizar en el siguiente gráfico de correlación, partiendo de que no existen correlaciones negativas.
+
+```{r, echo=FALSE}
+corrplot(ACP$var$cos2, is.corr = F)
+```
+
+Este biplot explica el 71% de la variabilidad total de los datos. 
+Entre entre más juntas esten las líneas entre ellas, quiere decir que tienen una mayor correlación.  
+
+Claramente hay una clara relación entre el tiempo que llevan trabajando en el mismo _[Empleo_ - _Residencia]_. Asimismo, Hay una fuerte entre _[Ingreso_ - _Ahorro]_ y _[Deuda_ - _# de tarjetas de crédito]_.
+
+La escala de colores está de acuerdo al cos2 o bien, la calidad de representación.
+
+El **CP1** tiene fuerte relación (como se mencionó previamente) con las variables: _Edad_, _Residencia_, _Empleo_ y _Ahorros_, aspectos relacionados a la estabilidad financiera a largo plazo.
+
+El **CP2** mide el historial crediticio de la persona que solicita el préstamo por su relación con la _Deuda_ y _Tarjetas de crédito_.
+
+```{r, echo=FALSE}
+fviz_pca_var(ACP, repel = T,
+             col.var = "cos2",
+             gradient.cols = c("#F39792","#C3F392","#545984"),
+             title = "Variables por calidad de Representanción en el plano")
+```
+
+
+La siguiente gráfica nos señala la distribución de las observaciones a lo largo del plano, para efecto de individuos rotulados de interés, nos puede ayudar a clasificarlos (en este caso a ver qué clase de potenciales clientes son).
+
+```{r, echo=FALSE}
+fviz_pca_ind(ACP,
+             col.ind = "cos2", # Coloreado por el la calidad de representación en el plano
+             gradient.cols = c("#F39792","#C3F392","#545984"),
+             repel = T, title = "Observaciones por calidad de Representanción en el plano")
+```
+
+Finalmente, podemos ver la comparación de las observaciones y variables en el plano; por ejemplo la observación _16_ es un potencial cliente responsable por la estabilidad que muestra.
+
+
+```{r, echo=FALSE}
+fviz_pca_biplot(ACP, repel = T,
+                col.var = "#BB195E", # Variables color
+                col.ind = "#696969", title = "Observaciones y variables"  # Individuals color
+)
+```
